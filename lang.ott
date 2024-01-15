@@ -1,0 +1,123 @@
+%% This file uses the Ott tool to specify the grammar, typing and
+%% evaluation rules for the call-by-value lambda calculus
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% METAVARIABLES
+
+indexvar index, i, j, k ::= {{ com index metavariables }}
+
+metavar a, b, x ::= {{ com scalar (Fp) constants }}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% GRAMMAR 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+grammar
+
+lia, n, m :: 'lia_' ::= {{ com linear arithmetic }}
+  | i     :: :: constant {{ com constant integer }}
+  | 1     :: :: one {{ com One }}
+  | n + m :: :: add {{ com integer addition }}
+  | n - m :: :: sub {{ com integer subtraction }}
+  | i * n :: :: mul {{ com scalar multiplication }}
+  
+var, x :: '' ::= {{ com variable }}
+  | x^i ::  :: xn {{ com variable power }} {{ tex [[x]]^[[i]] }}
+  
+poly, p, q :: 'poly_' ::= {{ com polynomials }}
+  | ax^i :: :: unicoef
+    {{ com Univariate polynomial in coefficient form }}
+    {{ tex [[a]]_[[i]][[x]]^[[i]] + \ldots + [[a]]_[[1]][[x]] + [[a]]_0 }}
+  | { (ai, bi) } :: :: unieval
+    {{ com Univariate polynomial in evaluation form }}
+    {{ tex \{ ([[a]]_1, [[b]]_1), \ldots , ([[a]]_[[i]], [[b]]_[[i]]) \} }} 
+  | { ai } :: :: multieval
+    {{ com Multilinear polynomila in evaluation form }}
+    {{ tex \{ ([[a]]_1, [[a]]_[[i]]) \} }}
+
+expr, e,d :: '' ::= {{ com expressions }}
+  | p         ::  :: const {{ com Constant polynomial }}
+  | e + d     ::  :: add {{ com Polynomial addition }}
+  | e - d     ::  :: sub {{ com Polynomial subtraction }}
+  | e * d     ::  :: mul {{ com Polynomial multiplication }}
+  | e / d     ::  :: div {{ com Polynomial division }}
+  | dom < d > ::  :: domain
+    {{ com Domain (set) of scalars }}
+    {{ tex \texttt{Dom}\langle [[d]]\rangle }}
+  | interpolate < e > ::  :: interpolate
+    {{ com Interpolate from points to coefficient form }}
+    {{ tex \texttt{interpolate}\langle [[e]]\rangle }}
+  | evaluate < e, d > ::  :: evaluate
+    {{ com Evaluate coefficient form over domain }}
+    {{ tex \texttt{evaluate}\langle [[e]], [[d]]\rangle }}	
+  | d : [ e1 ,..., ei ]  ::  :: vector {{ com Non-empty vector }}
+  | e @ d     ::  :: concat {{ com Concatenate vectors }}
+  
+type, t, s :: 'typ_' ::= {{ com Static types }}
+  | Coef n :: :: unicoef {{ com Univariate polynomial in coeffiicent form }} {{ tex \texttt{Coef}(x^[[n]]) }}
+  | Eval n :: :: unieval {{ com Univariate polynomial in evaluation form }} {{ tex \texttt{Eval}(x_[[n]]) }}
+  | MLE  n :: :: multieval  {{ com Multilinear polynomila in evaluation form }} {{ tex \texttt{MLE}(\{0,1\}^n) }}
+  | Dom n       :: :: domain {{ com Evaluation domain of size n }}
+  | [ t ; n ]   :: :: vector {{ com Vector of length n }}
+
+constraint, c :: 'constr_' ::= {{ com Single type constraint }}
+  | n = m :: :: eq {{ com Equality LIA constraint }} {{ tex [[n]] = [[m]] }}
+  | n <= m :: :: leq {{ com Less-than-equal LIA constraint }} {{ tex [[n]] \leq [[m]] }}
+  | t <: s :: :: sub {{ com Subtyping constraint }} {{ tex [[t]] \leq [[s]] }}      
+  | t = t1 + t2 :: :: cup
+    {{ com Type least-upper bound constraint }}
+    {{ tex [[t]] = [[t1]] \sqcup [[t2]] }}
+  | t = ti +...+ tj :: :: bigcup
+    {{ com Type big-least-upper bound constraint }}
+    {{ tex \bigsqcup_{i=[[i]]}^[[j]] [[t]]_i }}
+
+constraints, C :: 'C_' ::= {{ com Constraint system }}
+  | [] :: :: empty {{ com Empty constraint system }}
+  | C @ c :: :: cons {{ com Append to constraints }} {{ tex [[C]] \cup [[c]] }}
+  | C1 + C2 :: :: union {{ com Union of constraints }} {{ tex [[C1]] \cup [[C2]] }}	
+  | C_i +...+ C_j :: :: bigunion {{ com Cumulative union of constraints }} {{ tex \bigcup_{i=[[i]]}^[[j]] [[C]]_i }}
+  
+terminals :: terminals_ ::=
+  | |- :: :: entails {{ tex \vdash }}
+  | G :: :: gamma {{ tex \Gamma }}
+  
+formula :: formula_ ::=
+  | judgement          ::   :: judgement
+  | formula1 .. formulai   :: :: dots
+
+parsing
+
+C_cons <= C_bigunion     % #9
+
+defns
+
+JTyp :: '' ::=
+
+defn
+G, C |- e : t ::   :: Typ :: 'Typ_' {{ com Type inference }}
+by
+
+------------------------:: UniCoef
+G, C |-  ax^i : Coef i
+
+
+------------------------------- :: UniEval
+G, C |-  {(ai, bi)} : Eval i
+
+----------------------- :: MultiEval
+G, C |- { ai } : MLE i
+
+
+G, C0 |-  e0 : t0   G, C1 |- e1 : t1 .. G, Ci |- ei : ti
+----------------------------------------------------------------- :: Vector
+G, C0 +...+ Ci @ t= t0 +...+ ti |-  d : [ e1,...,e2 ] : [t; i + 1]
+
+
+G, C |-  e1: [t1; n]   G, C |- e2: [t2; m]
+-------------------------------------------- :: Concat
+G, C @ t = t1 + t2 |-  e1 @ e2 : [t; n + m]
+
+G, C |- e : Coef n   G, C |- d: Dom m 
+--------------------------------------------------- :: Evaluate
+G, C @ n <= m |- evaluate<e, d> : Eval n
+
